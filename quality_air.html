@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Calidad del Aire - Selector de Ciudades</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+    .card {
+      background: #1e293b;
+      border-radius: 16px;
+      padding: 30px;
+      max-width: 480px;
+      width: 100%;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+    }
+    h1 { font-size: 1.5rem; margin-bottom: 5px; }
+    .subtitle { color: #94a3b8; font-size: 0.9rem; margin-bottom: 20px; }
+    select {
+      width: 100%;
+      padding: 12px 16px;
+      margin-bottom: 20px;
+      border-radius: 8px;
+      border: 1px solid #475569;
+      background: #334155;
+      color: #e2e8f0;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+    select:focus { outline: 2px solid #3b82f6; }
+    .semaforo {
+      text-align: center;
+      padding: 25px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+      background: #334155;
+      transition: background 0.3s, border 0.3s;
+    }
+    .semaforo .valor { font-size: 3rem; font-weight: bold; }
+    .semaforo .unidad { font-size: 1rem; color: #cbd5e1; }
+    .semaforo .estado { font-size: 1.1rem; margin-top: 8px; font-weight: 600; }
+    .contaminantes { display: grid; gap: 12px; margin-bottom: 20px; }
+    .fila {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #334155;
+      padding: 12px 16px;
+      border-radius: 8px;
+    }
+    .fila .nombre { color: #cbd5e1; }
+    .fila .dato { font-weight: bold; font-size: 1.1rem; }
+    .actualizacion { text-align: center; color: #64748b; font-size: 0.8rem; }
+    button {
+      width: 100%;
+      padding: 12px;
+      margin-top: 15px;
+      border: none;
+      border-radius: 8px;
+      background: #3b82f6;
+      color: white;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button:hover { background: #2563eb; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>🌍 Calidad del Aire</h1>
+    <p class="subtitle">Selecciona una ciudad para ver sus datos en vivo</p>
+
+    <select id="selectorCiudad" onchange="cargarDatos()">
+      <option value="-12.05,-77.04">Lima, Perú</option>
+      <option value="-34.60,-58.38">Buenos Aires, Argentina</option>
+      <option value="4.71,-74.07">Bogotá, Colombia</option>
+      <option value="-33.45,-70.66">Santiago, Chile</option>
+      <option value="19.43,-99.13">Ciudad de México, México</option>
+      <option value="40.42,-3.70">Madrid, España</option>
+      <option value="41.39,2.17">Barcelona, España</option>
+      <option value="-0.18,-78.47">Quito, Ecuador</option>
+      <option value="-16.50,-68.15">La Paz, Bolivia</option>
+      <option value="10.48,-66.90">Caracas, Venezuela</option>
+      <option value="22.32,114.17">Hong Kong, China</option>
+    </select>
+
+    <div class="semaforo" id="semaforo">
+      <div class="valor" id="valorPrincipal">--</div>
+      <div class="unidad">µg/m³ PM2.5</div>
+      <div class="estado" id="estado">Cargando...</div>
+    </div>
+
+    <div class="contaminantes">
+      <div class="fila">
+        <span class="nombre">PM10</span>
+        <span class="dato" id="pm10">--</span>
+      </div>
+      <div class="fila">
+        <span class="nombre">Ozono (O₃)</span>
+        <span class="dato" id="ozono">--</span>
+      </div>
+      <div class="fila">
+        <span class="nombre">NO₂</span>
+        <span class="dato" id="no2">--</span>
+      </div>
+    </div>
+
+    <p class="actualizacion" id="actualizacion">Esperando datos...</p>
+    <button onclick="cargarDatos()">🔄 Actualizar</button>
+  </div>
+
+  <script>
+    function clasificarPM25(valor) {
+      if (valor <= 12) return { texto: 'Buena', color: '#22c55e' };
+      if (valor <= 35) return { texto: 'Moderada', color: '#eab308' };
+      if (valor <= 55) return { texto: 'Dañina para grupos sensibles', color: '#f97316' };
+      if (valor <= 150) return { texto: 'Dañina', color: '#ef4444' };
+      return { texto: 'Muy dañina', color: '#7f1d1d' };
+    }
+
+    async function cargarDatos() {
+      const selector = document.getElementById('selectorCiudad');
+      const [lat, lon] = selector.value.split(',');
+      const nombreCiudad = selector.options[selector.selectedIndex].text;
+
+      const estado = document.getElementById('estado');
+      const actualizacion = document.getElementById('actualizacion');
+      estado.textContent = 'Cargando...';
+
+      try {
+        const url = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&current=pm10,pm2_5,ozone,nitrogen_dioxide`;
+        const respuesta = await fetch(url);
+        const datos = await respuesta.json();
+        const actual = datos.current;
+
+        const pm25 = actual.pm2_5;
+        const clase = clasificarPM25(pm25);
+
+        document.getElementById('valorPrincipal').textContent = pm25.toFixed(1);
+        estado.textContent = clase.texto;
+        document.getElementById('semaforo').style.background = clase.color + '33';
+        document.getElementById('semaforo').style.border = `2px solid ${clase.color}`;
+
+        document.getElementById('pm10').textContent = actual.pm10.toFixed(1) + ' µg/m³';
+        document.getElementById('ozono').textContent = actual.ozone.toFixed(1) + ' µg/m³';
+        document.getElementById('no2').textContent = actual.nitrogen_dioxide.toFixed(1) + ' µg/m³';
+
+        const hora = new Date().toLocaleTimeString('es-ES');
+        actualizacion.textContent = `${nombreCiudad} · Última actualización: ${hora}`;
+
+      } catch (error) {
+        estado.textContent = 'Error al cargar datos';
+        actualizacion.textContent = 'Revisa tu conexión a internet';
+        console.error(error);
+      }
+    }
+
+    // Cargar la ciudad por defecto al abrir la página
+    cargarDatos();
+  </script>
+</body>
+</html>
